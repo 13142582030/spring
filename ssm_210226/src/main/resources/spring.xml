@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd http://www.springframework.org/schema/aop https://www.springframework.org/schema/aop/spring-aop.xsd http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd">
+
+<!-- ☆☆☆☆   该配置文件包含Spring、Mybatis两部分-->
+<!--  Spring部分  -->
+    <!--    Spring的 IOC ：扫描所有类 -->
+    <context:component-scan base-package="wxw">
+        <context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+    </context:component-scan>
+    <!--    Spring的 AOP ：日志实现 -->
+    <aop:config>
+        <!-- 日志类的切入点       -->
+        <aop:pointcut id="logPc" expression="execution(* wxw.service..*.*(..))"/>
+        <!-- 使用自定的日志类       -->
+        <aop:aspect ref="myLog">
+            <!-- 定义连接点before ，其他的还有after、beforeReturning、afterThrowing-->
+            <aop:before method="doBefore" pointcut-ref="logPc"></aop:before>
+        </aop:aspect>
+    </aop:config>
+
+<!--  Mybatis部分 -->
+    <!-- 配置底层的数据源（使用Druid数据源）   -->
+    <bean class="com.alibaba.druid.pool.DruidDataSource" id="dataSource">
+        <property name="username" value="root"></property>
+        <property name="password" value="wxw5201314"></property>
+        <property name="url" value="jdbc:mysql://127.0.0.1:3306/db?serverTimezone=UTC"></property>
+        <property name="driverClassName" value="com.mysql.cj.jdbc.Driver"></property>
+    </bean>
+    <!-- 配置底层重要的Sql会化工厂   -->
+    <bean class="org.mybatis.spring.SqlSessionFactoryBean" id="sqlSessionFactory">
+        <property name="dataSource" ref="dataSource"></property>
+        <!--  可以直接配置映射文件的位置，这里用了配置文件（文件中定义映射文件的位置）      -->
+        <property name="configLocation" value="classpath:mybatis.xml"></property>
+    </bean>
+
+    <!-- 实例化我们要用的接口（因为接口不能直接用里面的方法）   -->
+    <bean class="org.mybatis.spring.mapper.MapperFactoryBean" id="newMapper">
+        <property name="sqlSessionFactory" ref="sqlSessionFactory"></property>
+        <property name="mapperInterface" value="wxw.dao.NewMapper"></property>
+    </bean>
+
+    <!--   ☆ 事务管理（需要用到Spring的AOP）-->
+    <!-- 事务控制器   -->
+    <bean class="org.springframework.jdbc.datasource.DataSourceTransactionManager" id="transactionManager">
+        <property name="dataSource" ref="dataSource"></property>
+    </bean>
+    <!-- 事务通知   -->
+    <tx:advice id="transactionInterceptor" transaction-manager="transactionManager">
+        <tx:attributes>
+            <tx:method name="*" read-only="false" propagation="REQUIRED"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <!-- aop实现上面的事务通知   -->
+    <aop:config>
+        <!-- 事务通知需要一个切入点       -->
+        <aop:pointcut id="txPc" expression="execution(* wxw.service..*.*(..))"/>
+        <aop:advisor advice-ref="transactionInterceptor" pointcut-ref="txPc"></aop:advisor>
+    </aop:config>
+</beans>
